@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.4](https://github.com/zhinjs/qq-official-bot/compare/v1.0.3...v1.0.4) (2024-12-27)
+
+
+### Bug Fixes
+
+* 增加连接方式选择 ([45358b0](https://github.com/zhinjs/qq-official-bot/commit/45358b0fc70d42f282b0666b3a2a45ae8c910a35))
+* 增加连接方式选择 ([e662ee5](https://github.com/zhinjs/qq-official-bot/commit/e662ee517fab3bbace99022e117bcde8dd72f3ff))
+* 增加连接方式选择 ([3400d44](https://github.com/zhinjs/qq-official-bot/commit/3400d44c8f852ddf81874239b24f102d0da2a1cd))
+* 增加连接方式选择 ([8ef3f47](https://github.com/zhinjs/qq-official-bot/commit/8ef3f47a2c4650a61cea8c0730224ac7e27d4e4e))
+
 ## [1.0.3](https://github.com/zhinjs/qq-official-bot/compare/v1.0.2...v1.0.3) (2024-09-27)
 
 
