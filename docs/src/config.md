@@ -4,16 +4,20 @@ layout: doc
 
 # 配置项
 
-| 属性名      | 类型                  | 描述                                    | 默认值   |
-|----------|---------------------|---------------------------------------|-------|
-| appid    | string              | qq机器人的appid 必填                        | -     |
-| secret   | string              | qq机器人的secret 必填                       | -     |
-| sandbox  | boolean             | 是否使用沙箱环境                              | false |
-| intents  | [Intent](#intent)[] | 监听哪些官方事件 必填   | -     |
-| logLevel | string              | 输出日志等级                                | info  |
-| removeAt | boolean             | 是否移除频道/群聊消息@机器人的消息段                   | false |
-| maxRetry | number              | 机器人与qq官方的通信端口时的最大重连次数                 | 10    |
-| timeout  | number              | 机器人与请求官方接口的超时时间，单位毫秒                  | 5000  |
+| 属性名         | 类型                             | 描述                            | 默认值   |
+|-------------|--------------------------------|-------------------------------|-------|
+| appid       | string                         | qq机器人的appid 必填                | -     |
+| secret      | string                         | qq机器人的secret 必填               | -     |
+| sandbox     | boolean                        | 是否使用沙箱环境                      | false |
+| intents     | [Intent](#intent)[]            | 监听哪些官方事件 必填                   | -     |
+| logLevel    | string                         | 输出日志等级                        | info  |
+| removeAt    | boolean                        | 是否移除频道/群聊消息@机器人的消息段           | false |
+| maxRetry    | number                         | 机器人与qq官方的通信端口时的最大重连次数         | 10    |
+| timeout     | number                         | 机器人与请求官方接口的超时时间，单位毫秒          | 5000  |
+| mode        | websocket\|webhook\|middleware | 连接方式                          | -     |
+| port        | number                         | webhook监听端口，mode为webhook时必填   | -     |
+| path        | string                         | webhook监听路径，mode为webhook时必填   | -     |
+| application | koa\|express                   | 使用中间件的应用平台，mode为middleware时必填 | -     |
 
 # intent
 
