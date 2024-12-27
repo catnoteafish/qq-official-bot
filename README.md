@@ -10,7 +10,7 @@ npm i qq-official-bot # or yarn add qq-official-bot
 ```
 
 ## 使用
-
+### 1. link with websocket
 ```js
 const {Bot} = require('qq-official-bot')
 // 创建机器人
@@ -33,11 +33,75 @@ const bot = new Bot({
 		'GUILD_MEMBERS', // 频道成员变更事件
 		'DIRECT_MESSAGE', // 频道私信事件
 	], // (必填)
+	mode:'websocket',
 })
 // 启动机器人
 bot.start()
 ```
+### 2. link with webhook
+```js
+const {Bot} = require('qq-official-bot')
+// 创建机器人
+const bot = new Bot({
+	appid: '', // qq机器人的appID (必填)
+	secret: '', // qq机器人的secret (必填)
+	sandbox: true, // 是否是沙箱环境 默认 false
+	removeAt: true, // 移除第一个at 默认 false
+	logLevel: 'info', // 日志等级 默认 info
+	maxRetry: 10, // 最大重连次数 默认 10
+	intents: [
+		'GROUP_AT_MESSAGE_CREATE', // 群聊@消息事件 没有群权限请注释
+		'C2C_MESSAGE_CREATE', // 私聊事件 没有私聊权限请注释
+		'GUILD_MESSAGES', // 私域机器人频道消息事件 公域机器人请注释
+		'PUBLIC_GUILD_MESSAGES', // 公域机器人频道消息事件 私域机器人请注释
+		'DIRECT_MESSAGE', // 频道私信事件
+        'MESSAGE_AUDIT', // 消息审核事件
+		'GUILD_MESSAGE_REACTIONS', // 频道消息表态事件
+		'GUILDS', // 频道变更事件
+		'GUILD_MEMBERS', // 频道成员变更事件
+		'DIRECT_MESSAGE', // 频道私信事件
+	], // (必填)
+	mode:'weboook',
+    port: 3000, // webhook监听端口
+    path: '/webhook', // webhook监听路径
+})
+// 启动机器人
+bot.start()
+```
+### 3. link with express/koa
+```js
+const {Bot} = require('qq-official-bot')
+const express = require('express')
+// 创建机器人
+const bot = new Bot({
+	appid: '', // qq机器人的appID (必填)
+	secret: '', // qq机器人的secret (必填)
+	sandbox: true, // 是否是沙箱环境 默认 false
+	removeAt: true, // 移除第一个at 默认 false
+	logLevel: 'info', // 日志等级 默认 info
+	maxRetry: 10, // 最大重连次数 默认 10
+	intents: [
+		'GROUP_AT_MESSAGE_CREATE', // 群聊@消息事件 没有群权限请注释
+		'C2C_MESSAGE_CREATE', // 私聊事件 没有私聊权限请注释
+		'GUILD_MESSAGES', // 私域机器人频道消息事件 公域机器人请注释
+		'PUBLIC_GUILD_MESSAGES', // 公域机器人频道消息事件 私域机器人请注释
+		'DIRECT_MESSAGE', // 频道私信事件
+        'MESSAGE_AUDIT', // 消息审核事件
+		'GUILD_MESSAGE_REACTIONS', // 频道消息表态事件
+		'GUILDS', // 频道变更事件
+		'GUILD_MEMBERS', // 频道成员变更事件
+		'DIRECT_MESSAGE', // 频道私信事件
+	], // (必填)
+	mode:'middleware',
+    applacation:'express', // express/koa
+})
+// 启动机器人
+bot.start()
+express()
+    .use(bot.middleware)
+    .listen(3000)
 
+```
 ## 发送消息
 ```javascript
 const {Bot} = require('qq-official-bot')

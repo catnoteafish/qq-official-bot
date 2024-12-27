@@ -1,6 +1,6 @@
 import {Announce, Bot, EmojiType, PinsMessage, Sendable} from "@";
 import {Message} from "@/message"
-import {EventParser} from "@/event";
+import {EventParser} from "@/events";
 
 export interface MessageEvent {
     reply(message: Sendable, quote?: boolean): Promise<any>

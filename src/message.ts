@@ -4,6 +4,8 @@ import {Dict} from "@/types";
 import {trimQuote} from "@/utils";
 import {Bot} from "./bot";
 import {User} from "@/entries/user";
+import {Receiver} from "@/receiver";
+import {ApplicationPlatform} from "@/receivers/webhook";
 
 export class Message {
     message_type: Message.Type
@@ -21,7 +23,7 @@ export class Message {
     sender: Message.Sender
     user_id: string
 
-    constructor(public bot: Bot, attrs: Dict) {
+    constructor(public bot: Bot<Receiver.ReceiveMode,ApplicationPlatform>, attrs: Dict) {
         const {message_reference,...other_attrs} = attrs
         Object.assign(this, other_attrs)
         if(message_reference) this.source={

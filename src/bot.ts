@@ -25,13 +25,16 @@ import {Sender} from "@/entries/sender";
 import {AxiosResponse} from "axios";
 import {GuildMember} from "@/entries/guildMember";
 import {User} from "@/entries/user";
-import {ActionNoticeEvent} from "@/event/notice";
-import {GuildMessageEvent, PrivateMessageEvent} from "@/event";
+import {ActionNoticeEvent} from "@/events/notice";
+import {GuildMessageEvent, PrivateMessageEvent} from "./events";
+import {Receiver} from "@/receiver";
+import {ApplicationPlatform} from "@/receivers/webhook";
+import {ResolveReceiver} from "@/sessionManager";
 
 
-export class Bot extends QQBot {
+export class Bot<T extends Receiver.ReceiveMode=Receiver.ReceiveMode,M extends ApplicationPlatform=ApplicationPlatform> extends QQBot<T,M> {
 
-    constructor(config: Bot.Config) {
+    constructor(config: Bot.Config<T,M>) {
         super(config)
         const nodeVersion=parseInt(process.version.slice(1))
         if(nodeVersion<16){
@@ -41,7 +44,10 @@ export class Bot extends QQBot {
             this.logger.debug(e.stack)
         })
     }
-
+    get middleware(){
+        if(this.config.mode!=='middleware') throw new Error('receiver mode is not middleware')
+        return (this.receiver as ResolveReceiver<'middleware', M>).handler.middleware
+    }
     /**
      * 获取机器人信息
      */
@@ -853,12 +859,12 @@ export namespace Bot {
         union_user_account?: string
     }
 
-    export interface Config extends QQBot.Config {
-    }
+    export type Config<T extends Receiver.ReceiveMode,M extends ApplicationPlatform=ApplicationPlatform> = {
+    } & QQBot.Config<T,M>
 }
-export function defineConfig(config:Bot.Config){
+export function defineConfig<T extends Receiver.ReceiveMode,M extends ApplicationPlatform=ApplicationPlatform>(config:Bot.Config<T,M>){
     return config
 }
-export function createBot(config:Bot.Config){
+export function createBot<T extends Receiver.ReceiveMode,M extends ApplicationPlatform=ApplicationPlatform>(config:Bot.Config<T,M>){
     return new Bot(config)
 }

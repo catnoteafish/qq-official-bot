@@ -4,22 +4,27 @@ import {FormData} from 'formdata-node'
 import * as log4js from 'log4js'
 import {EventEmitter} from "events";
 import {SessionManager} from "./sessionManager";
-import {Dict, LogLevel} from "@/types";
-import {EventMap, EventParserMap, GroupMessageEvent, GuildMessageEvent, PrivateMessageEvent, QQEvent} from "@/event";
+import {Dict, LogLevel, DataPacket} from "@/types";
+import {EventMap, EventParserMap, QQEvent} from "./events";
 import {Bot} from "./bot";
 import {Intent} from "@/constans";
 import { getFileBase64 } from "./utils";
+import {Receiver} from "@/receiver";
+import {ApplicationPlatform} from "@/receivers/webhook";
 
-export class QQBot extends EventEmitter {
+export class QQBot<T extends Receiver.ReceiveMode,M extends ApplicationPlatform=ApplicationPlatform> extends EventEmitter {
     request: AxiosInstance
     self_id: string
     nickname: string
     status: number
     logger: log4js.Logger
     ws: WebSocket
-    sessionManager: SessionManager
+    get receiver(){
+        return this.sessionManager.receiver
+    }
+    sessionManager: SessionManager<T,M>
 
-    constructor(public config: QQBot.Config) {
+    constructor(public config: QQBot.Config<T,M>) {
         super()
         this.sessionManager = new SessionManager(this)
         this.request = axios.create({
@@ -84,11 +89,11 @@ export class QQBot extends EventEmitter {
             this.logger.warn('unhandled event', event)
             return result
         }
-        return parser.apply(this as unknown as Bot, [event, result])
+        return parser.apply(this as unknown as Bot<T,M>, [event, result])
     }
 
 
-    dispatchEvent(event: string, wsRes: any) {
+    dispatchEvent(event: string, wsRes: DataPacket) {
         this.logger.debug(event, wsRes)
         const payload = wsRes.d;
         const event_id = wsRes.id || '';
@@ -140,7 +145,7 @@ export class QQBot extends EventEmitter {
 
 }
 
-export interface QQBot {
+export interface QQBot<T extends Receiver.ReceiveMode=Receiver.ReceiveMode,M extends ApplicationPlatform=ApplicationPlatform> {
     on<T extends keyof EventMap>(event: T, callback: EventMap[T]): this
 
     on<S extends string | symbol>(event: S & Exclude<string | symbol, keyof EventMap>, callback: (...args: any[]) => void): this
@@ -183,7 +188,7 @@ export namespace QQBot {
         cache: string
     }
 
-    export interface Config {
+    export type Config<T extends Receiver.ReceiveMode=Receiver.ReceiveMode,M extends ApplicationPlatform=ApplicationPlatform>={
         appid: string
         secret: string
         sandbox?: boolean
@@ -197,16 +202,7 @@ export namespace QQBot {
         delay?: Dict<number>
         intents?: Intent[]
         logLevel?: LogLevel
-    }
+        mode:T
+    } & Receiver.ReceiveModeConfig<M>[T]
 
-    export function getFullTargetId(message: GuildMessageEvent | GroupMessageEvent | PrivateMessageEvent) {
-        switch (message.message_type) {
-            case "private":
-                return `private-${message.guild_id||message.user_id}`
-            case "group":
-                return `group-${(message as GroupMessageEvent).group_id}:${message.user_id}`
-            case "guild":
-                return `guild-${(message as GuildMessageEvent).channel_id}:${message.user_id}`
-        }
-    }
 }

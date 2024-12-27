@@ -1,14 +1,19 @@
 import axios from "axios";
 import {QQBot} from "./qqBot";
-import {WebSocket} from "ws";
-import {toObject} from "./utils";
 import {EventEmitter} from "events";
-import {wsResData} from "@/types";
 import {Intends, OpCode, SessionEvents, WebsocketCloseReason} from "@/constans";
+import {ApplicationPlatform, createWebhookReceiver,createMiddlewareReceiver} from "@/receivers/webhook";
+import {createWebsocketReceiver} from "@/receivers/websocket";
+import {Receiver} from "@/receiver";
+import {DataPacket} from "@/types";
 
 export const MAX_RETRY = 10;
-
-export class SessionManager extends EventEmitter {
+export type ResolveReceiver<T extends Receiver.ReceiveMode,M extends ApplicationPlatform=never>=T extends 'websocket' ?
+        ReturnType<typeof createWebsocketReceiver> :
+        T extends 'middleware' ?
+            ReturnType<typeof createMiddlewareReceiver<M>> :
+            ReturnType<typeof createWebhookReceiver>
+export class SessionManager<T extends Receiver.ReceiveMode,M extends ApplicationPlatform=never> extends EventEmitter {
     public access_token: string;
     public wsUrl: string;
     retry: number = 0;
@@ -24,11 +29,33 @@ export class SessionManager extends EventEmitter {
         op: OpCode.HEARTBEAT,
         d: null // 心跳唯一值
     };
+    receiver:ResolveReceiver<T,M>
 
-
-    constructor(private bot: QQBot) {
+    #bot:QQBot<T, M>
+    get bot(){
+        return this.#bot
+    }
+    constructor(bot: QQBot<T,M>) {
         super();
-        this.on(SessionEvents.EVENT_WS, (data) => {
+        this.#bot=bot
+        switch (bot.config.mode){
+            case 'middleware':
+                this.receiver=createMiddlewareReceiver((bot.config as QQBot.Config<'middleware'>).application) as ResolveReceiver<T,M>
+                break;
+            case 'webhook':
+                const {port,path}=bot.config as QQBot.Config<'webhook'>
+                this.receiver=createWebhookReceiver(port,path) as ResolveReceiver<T, M>
+                break;
+            case 'websocket':
+                this.receiver=createWebsocketReceiver() as ResolveReceiver<T, M>
+                break;
+            default:
+                throw new Error('unknown mode' + bot.config.mode)
+        }
+        this.receiver.on("packet",(packet:DataPacket)=>{
+            this.bot.dispatchEvent(packet.t,packet)
+        })
+        this.on(SessionEvents.EVENT_WS,async (data) => {
             switch (data.eventType) {
                 case SessionEvents.RECONNECT:
                     this.bot.logger.mark("[CLIENT] 等待断线重连中...");
@@ -41,6 +68,7 @@ export class SessionManager extends EventEmitter {
                             this.sessionRecord = data.eventMsg;
                         }
                         this.isReconnect = data.code === 4009
+                        this.bot.ws.close()
                         this.start();
                         this.retry += 1;
                     } else {
@@ -94,7 +122,7 @@ export class SessionManager extends EventEmitter {
     }
 
     async getWsUrl() {
-        return new Promise<void>((resolve) => {
+        return new Promise<string>((resolve) => {
             this.bot.request.get("/gateway/bot", {
                 headers: {
                     Accept: "*/*",
@@ -107,7 +135,7 @@ export class SessionManager extends EventEmitter {
             }).then(res => {
                 if (!res.data) throw new Error("获取ws连接信息异常");
                 this.wsUrl = res.data.url;
-                resolve();
+                resolve(res.data.url);
             });
         });
     }
@@ -124,167 +152,16 @@ export class SessionManager extends EventEmitter {
     }
 
     async start() {
-        if (!(await this.checkNeedToRestart())) {
-            return;
-        }
-        this.userClose = false;
-        this.connect();
-        this.startListen();
+        return new Promise<void>(async (resolve) => {
+            await this.getAccessToken()
+            this.receiver.emit('start',this)
+            this.receiver.on('ready',resolve)
+        })
     }
 
     async stop() {
         this.userClose = true
-        this.bot.ws?.close()
+        this.receiver.emit('stop',this)
     }
 
-    /* 校验是否需要重新创建 ws */
-    private async checkNeedToRestart() {
-        const originWsUrl = this.wsUrl;
-        const originAccessToken = this.access_token;
-        await this.getAccessToken();
-        await this.getWsUrl();
-        // 此时不存在示例或是实例正在关闭
-        if (!this.bot.ws || ![0, 1].includes(this.bot.ws.readyState)) {
-            return true;
-        }
-        const checked = originWsUrl !== this.wsUrl || originAccessToken !== this.access_token;
-        // 重启前先停止原来的实例
-        if (checked) {
-            await this.stop();
-        }
-        return checked;
-    }
-
-    connect() {
-        this.bot.ws = new WebSocket(this.wsUrl, {
-            headers: {
-                "Authorization": "QQBot " + this.access_token,
-                "X-Union-Appid": this.bot.config.appid
-            }
-        });
-    }
-
-    reconnectWs() {
-        const reconnectParam = {
-            op: OpCode.RESUME,
-            d: {
-                // token: `Bot ${this.bot.appId}${this.token}`,
-                token: `QQBot ${this.access_token}`,
-                session_id: this.sessionRecord.sessionID,
-                seq: this.sessionRecord.seq
-            }
-        };
-        this.sendWs(reconnectParam);
-    }
-
-    // 发送websocket
-    sendWs(msg: unknown) {
-        try {
-            // 先将消息转为字符串
-            this.bot.ws.send(typeof msg === "string" ? msg : JSON.stringify(msg));
-        } catch (e) {
-            this.bot.logger.error(e);
-        }
-    }
-
-    authWs() {
-        // 鉴权参数
-        const authOp = {
-            op: OpCode.IDENTIFY, // 鉴权参数
-            d: {
-                token: `QQBot ${this.access_token}`, // 根据配置转换token
-                intents: this.getValidIntends(), // todo 接受的类型
-                shard: [0, 1] // 分片信息,给一个默认值
-            }
-        };
-        // 发送鉴权请求
-        this.sendWs(authOp);
-    }
-
-    startListen() {
-        this.bot.ws.on("close", (code) => {
-            this.alive = false;
-            this.emit(SessionEvents.EVENT_WS, {
-                eventType: SessionEvents.DISCONNECT,
-                code,
-                eventMsg: this.sessionRecord
-            });
-            if (code) {
-                for(const e of WebsocketCloseReason){
-                    if (e.code === code) {
-                        return this.emit(SessionEvents.ERROR, code, e.reason);
-                    }
-                }
-                return this.emit(SessionEvents.ERROR, code,'未知错误')
-            }
-            this.bot.logger.error(`[CLIENT] 连接关闭`);
-        });
-        this.bot.ws.on("error", (e) => {
-            this.alive = false
-            this.bot.logger.mark("[CLIENT] 连接错误");
-            this.emit(SessionEvents.CLOSED, {eventType: SessionEvents.CLOSED});
-        });
-        this.bot.ws.on("message", (data) => {
-            this.bot.logger.debug(`[CLIENT] 收到消息: ${data}`);
-            // 先将消息解析
-            const wsRes = toObject<wsResData>(data);
-            // 先判断websocket连接是否成功
-            if (wsRes?.op === OpCode.HELLO && wsRes?.d?.heartbeat_interval) {
-                // websocket连接成功，拿到心跳周期
-                this.heartbeatInterval = wsRes?.d?.heartbeat_interval;
-                // 非断线重连时，需要鉴权
-                this.isReconnect ? this.reconnectWs() : this.authWs();
-                return;
-            }
-
-            // 鉴权通过
-            if (wsRes.t === SessionEvents.READY) {
-                this.bot.logger.mark(`[CLIENT] 鉴权通过`);
-                const {d, s} = wsRes;
-                const {session_id, user = {}} = d;
-                this.bot.self_id = user.id;
-                this.bot.nickname = user.username;
-                this.bot.status = user.status || 0;
-                // 获取当前会话参数
-                if (session_id && s) {
-                    this.sessionRecord.sessionID = session_id;
-                    this.sessionRecord.seq = s;
-                    this.heartbeatParam.d = s;
-                }
-                this.bot.logger.info(`connect to ${user.username}(${user.id})`)
-                this.isReconnect = false
-                this.emit(SessionEvents.READY, {eventType: SessionEvents.READY, msg: d || ""});
-                // 第一次发送心跳
-                this.bot.logger.debug(`[CLIENT] 发送第一次心跳`, this.heartbeatParam);
-                this.sendWs(this.heartbeatParam);
-                return;
-            }
-            // 心跳测试
-            if (wsRes.op === OpCode.HEARTBEAT_ACK || wsRes.t === SessionEvents.RESUMED) {
-                if (!this.alive) {
-                    this.alive = true;
-                    this.emit(SessionEvents.EVENT_WS, {eventType: SessionEvents.READY});
-                }
-                this.bot.logger.debug("[CLIENT] 心跳校验", this.heartbeatParam);
-                setTimeout(() => {
-                    this.sendWs(this.heartbeatParam);
-                }, this.heartbeatInterval);
-            }
-
-            // 收到服务端重连的通知
-            if (wsRes.op === OpCode.RECONNECT) {
-                // 通知会话，当前已断线
-                this.emit(SessionEvents.EVENT_WS, {eventType: SessionEvents.RECONNECT});
-            }
-
-            // 服务端主动推送的消息
-            if (wsRes.op === OpCode.DISPATCH) {
-                // 更新心跳唯一值
-                const {s} = wsRes;
-                if (s) this.sessionRecord.seq = this.heartbeatParam.d = s;
-                // OpenAPI事件分发
-                this.bot.dispatchEvent(wsRes.t, wsRes);
-            }
-        });
-    }
 }

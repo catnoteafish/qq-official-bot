@@ -3,7 +3,7 @@ import {randomInt} from "crypto";
 import fs from "node:fs/promises";
 import {Blob} from "formdata-node"
 import FileInfo = Message.FileInfo;
-import {MessageAuditEvent} from "@/event";
+import {MessageAuditEvent} from "../events";
 
 export class Sender {
     brief: string = ''

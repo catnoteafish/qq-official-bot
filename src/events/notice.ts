@@ -1,5 +1,5 @@
 import {AuditType, Bot, Dict, Emoji, ReactionTargetType} from "@";
-import {EventParser} from "@/event/index";
+import {EventParser} from "@/events/index";
 
 export class NoticeEvent {
     notice_type: NoticeEvent.Type
