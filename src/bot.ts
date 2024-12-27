@@ -28,7 +28,7 @@ import {User} from "@/entries/user";
 import {ActionNoticeEvent} from "@/events/notice";
 import {GuildMessageEvent, PrivateMessageEvent} from "./events";
 import {Receiver} from "@/receiver";
-import {ApplicationPlatform} from "@/receivers/webhook";
+import {ApplicationPlatform, Middleware} from "@/receivers/webhook";
 import {ResolveReceiver} from "@/sessionManager";
 
 
@@ -44,9 +44,9 @@ export class Bot<T extends Receiver.ReceiveMode=Receiver.ReceiveMode,M extends A
             this.logger.debug(e.stack)
         })
     }
-    get middleware(){
+    get middleware():Middleware<M>{
         if(this.config.mode!=='middleware') throw new Error('receiver mode is not middleware')
-        return (this.receiver as ResolveReceiver<'middleware', M>).handler.middleware
+        return (this.receiver as ResolveReceiver<'middleware', M>).handler.middleware()
     }
     /**
      * 获取机器人信息
