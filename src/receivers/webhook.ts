@@ -7,8 +7,10 @@ import {DataPacket} from "@/types";
 import {Ed25519} from "@/ed25519";
 
 export type KoaContext = {
-    request: IncomingMessage,
-    response: ServerResponse
+    request: Record<string, any>
+    response: Record<string, any>
+    req: IncomingMessage,
+    res: ServerResponse
 }
 export type ApplicationPlatform = 'koa' | 'express'
 export type Middleware<T extends ApplicationPlatform> = T extends 'koa' ? KoaMiddleware : ExpressMiddleware
@@ -22,8 +24,9 @@ export type WebhookReceiverConfig = ServerConfig
 const createEd25519 = (secret: string) => {
     return new Ed25519(secret)
 }
-const resolveBodyData = async (req: IncomingMessage) => {
+const resolveBodyData = async (req: IncomingMessage,data) => {
     return new Promise<string>(resolve => {
+        if(data) resolve(data)
         const dataArr: Buffer[] = [];
         req.on('data', (data) => {
             dataArr.push(data)
@@ -34,8 +37,8 @@ const resolveBodyData = async (req: IncomingMessage) => {
     })
 }
 
-async function webhookHandler(this: Receiver, req: IncomingMessage, res: ServerResponse, ed25519: Ed25519) {
-    const bodyData = await resolveBodyData(req)
+async function webhookHandler<T=undefined>(this: Receiver, req: IncomingMessage, res: ServerResponse, ed25519: Ed25519,fallbackData?:T) {
+    const bodyData = await resolveBodyData(req,JSON.stringify(fallbackData))
     if (!ed25519) return
     const signature = req.headers['x-signature-ed25519']?.toString()
     const timestamp = req.headers['x-signature-timestamp']?.toString()
@@ -97,9 +100,10 @@ function getMiddleware<T extends ApplicationPlatform>(platform: ApplicationPlatf
             }>, ctx: KoaContext, next) {
                 next && await next()
                 return webhookHandler.apply(this, [
-                    ctx.request,
-                    ctx.response,
-                    this.handler.ed24419
+                    ctx.req,
+                    ctx.res,
+                    this.handler.ed24419,
+                    ctx.request.body
                 ])
             }) as Middleware<T>
         case 'express':

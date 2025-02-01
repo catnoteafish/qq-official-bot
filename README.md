@@ -61,7 +61,7 @@ const bot = new Bot({
 		'GUILD_MEMBERS', // 频道成员变更事件
 		'DIRECT_MESSAGE', // 频道私信事件
 	], // (必填)
-	mode:'weboook',
+	mode:'webhook',
     port: 3000, // webhook监听端口
     path: '/webhook', // webhook监听路径
 })
