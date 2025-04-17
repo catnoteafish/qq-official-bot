@@ -102,7 +102,7 @@ const bot = new Bot({
 		'DIRECT_MESSAGE', // 频道私信事件
 	], // (必填)
 	mode:'middleware',
-    applacation:'express', // express/koa
+    application:'express', // express/koa
 })
 // 启动机器人
 bot.start()
