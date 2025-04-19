@@ -58,7 +58,10 @@ async function webhookHandler<T=undefined>(this: Receiver, req: IncomingMessage,
                     signature:signed
                 }), 'utf8'))
         case OpCode.DISPATCH:
-            return this.emit('packet', data)
+            this.emit('packet', data)
+            return res
+                .writeHead(200)
+                .end()
     }
 }
 
